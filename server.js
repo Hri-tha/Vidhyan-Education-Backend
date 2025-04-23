@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const OpenAI = require('openai');
 const axios = require('axios');
-const Conversation = require('./models/Conversation'); // Add this
 const Faq = require('./models/Faq');
 
 require('dotenv').config();
@@ -16,7 +15,12 @@ const app = express();
 
 
 
+const MONGODB_URI = process.env.MONGODB_URI;
 
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is not defined');
+  process.exit(1);
+}
 
 // Middleware
 app.use(cors());
@@ -25,10 +29,17 @@ app.use(bodyParser.json());
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  socketTimeoutMS: 45000, 
 })
-.then(() => console.log('Connected to MongoDB Atlas'))
-.catch(err => console.error('Error connecting to MongoDB Atlas:', err));
+// .then(() => console.log('Connected to MongoDB Atlas'))
+// .catch(err => console.error('Error connecting to MongoDB Atlas:', err));
+.then(() => console.log('✅ Connected to MongoDB Atlas'))
+.catch(err => {
+  console.error('❌ Error connecting to MongoDB Atlas:', err);
+  process.exit(1);
+});
 
 // Models
 const Question = mongoose.model('Question', new mongoose.Schema({
