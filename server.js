@@ -23,7 +23,12 @@ if (!MONGODB_URI) {
 }
 
 // Middleware
-app.use(cors());
+// Middleware
+app.use(cors({
+  origin: 'https://vidhyan-education-frontend.vercel.app/',
+  credentials: true,
+}));
+// app.options('/*', cors()); // preflight support
 app.use(bodyParser.json());
 
 // MongoDB connection
