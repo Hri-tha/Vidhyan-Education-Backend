@@ -25,7 +25,7 @@ if (!MONGODB_URI) {
 // Middleware
 // Middleware
 app.use(cors({
-  origin: 'https://vidhyan-education-frontend.vercel.app/',
+  origin: 'https://vidhyan-education-frontend.vercel.app',
   credentials: true,
 }));
 // app.options('/*', cors()); // preflight support
