@@ -24,12 +24,30 @@ if (!MONGODB_URI) {
 
 // Middleware
 // Middleware
+// app.use(cors({
+//   origin: 'https://vidhyan-education-frontend.vercel.app',
+//   credentials: true,
+// }));
+// // app.options('/*', cors()); // preflight support
+// app.use(bodyParser.json());
+const allowedOrigins = [
+  'https://vidhyan-education-frontend.vercel.app',
+  'http://localhost:4200',
+];
+
 app.use(cors({
-  origin: 'https://vidhyan-education-frontend.vercel.app',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
-// app.options('/*', cors()); // preflight support
+
 app.use(bodyParser.json());
+
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -176,6 +194,30 @@ app.post('/api/chat', async (req, res) => {
 // Google Login API
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// app.post('/api/google-login', async (req, res) => {
+//   try {
+//     const { token } = req.body;
+//     const ticket = await client.verifyIdToken({
+//       idToken: token,
+//       audience: process.env.GOOGLE_CLIENT_ID
+//     });
+
+//     const { name, email, picture } = ticket.getPayload();
+
+//     let user = await User.findOne({ email });
+
+//     if (!user) {
+//       user = await User.create({ name, email, password: 'google_oauth', avatar: picture });
+//     }
+
+//     const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+//     res.json({ token: jwtToken, user });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(400).send({ error: 'Google login failed' });
+//   }
+// });
+
 app.post('/api/google-login', async (req, res) => {
   try {
     const { token } = req.body;
@@ -193,12 +235,22 @@ app.post('/api/google-login', async (req, res) => {
     }
 
     const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
-    res.json({ token: jwtToken, user });
+
+    // 👇 Only send safe public user info
+    const safeUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar
+    };
+
+    res.json({ token: jwtToken, user: safeUser });
   } catch (err) {
     console.error(err);
     res.status(400).send({ error: 'Google login failed' });
   }
 });
+
 
 // Main APIs
 app.get('/api/questions', async (req, res) => {
