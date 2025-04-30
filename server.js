@@ -8,6 +8,7 @@ const { OAuth2Client } = require('google-auth-library');
 const OpenAI = require('openai');
 const axios = require('axios');
 const Faq = require('./models/Faq');
+const College = require('./models/College');
 
 require('dotenv').config();
 
@@ -193,31 +194,6 @@ app.post('/api/chat', async (req, res) => {
 
 // Google Login API
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// app.post('/api/google-login', async (req, res) => {
-//   try {
-//     const { token } = req.body;
-//     const ticket = await client.verifyIdToken({
-//       idToken: token,
-//       audience: process.env.GOOGLE_CLIENT_ID
-//     });
-
-//     const { name, email, picture } = ticket.getPayload();
-
-//     let user = await User.findOne({ email });
-
-//     if (!user) {
-//       user = await User.create({ name, email, password: 'google_oauth', avatar: picture });
-//     }
-
-//     const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
-//     res.json({ token: jwtToken, user });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(400).send({ error: 'Google login failed' });
-//   }
-// });
-
 app.post('/api/google-login', async (req, res) => {
   try {
     const { token } = req.body;
@@ -248,6 +224,60 @@ app.post('/api/google-login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(400).send({ error: 'Google login failed' });
+  }
+});
+
+app.post('/api/compare', async (req, res) => {
+  try {
+    const { college1, college2 } = req.body;
+
+    if (!college1 && !college2) {
+      return res.status(400).json({ error: 'At least one college (college1 or college2) is required.' });
+    }
+
+    const allColleges = await College.find({}); // fetch all colleges
+
+    function normalizeName(name) {
+      return name
+        .toLowerCase()
+        .replace('indian institute of information technology', 'iiit')
+        .replace('indian institute of technology', 'iit')
+        .replace('national institute of technology', 'nit')
+        .replace(/,/g, '') // remove commas
+        .replace(/\s+/g, ' ') // replace multiple spaces
+        .trim();
+    }
+
+    const normalizedColleges = allColleges.map(college => ({
+      original: college,
+      normalized: normalizeName(college.name)
+    }));
+
+    function findCollege(input) {
+      if (!input) return null; // if input is undefined
+      const normalizedInput = normalizeName(input);
+      return normalizedColleges.find(college => college.normalized.includes(normalizedInput));
+    }
+
+    const match1 = findCollege(college1);
+    const match2 = findCollege(college2);
+
+    // If none matched
+    if (!match1 && !match2) {
+      return res.status(404).json({ error: 'No matching college found.' });
+    }
+
+    // If both found
+    if (match1 && match2) {
+      return res.json([match1.original, match2.original]);
+    }
+
+    // If only one found
+    const foundCollege = match1 || match2;
+    res.json(foundCollege.original);
+  } catch (error) {
+    console.error('Error fetching college data:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
