@@ -9,6 +9,7 @@ const OpenAI = require('openai');
 const axios = require('axios');
 const Faq = require('./models/Faq');
 const College = require('./models/College');
+const stringSimilarity = require('string-similarity');
 
 require('dotenv').config();
 
@@ -148,15 +149,13 @@ app.patch('/api/me/career', authMiddleware, async (req, res) => {
   }
 });
 
-// const openai = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY,
-// });
 
 Faq.collection.createIndex({ question: "text" });
 
+
 app.post('/api/chat', async (req, res) => {
   const { question } = req.body;
-  
+
   if (!question) {
     return res.status(400).json({ error: 'Question is required' });
   }
@@ -168,18 +167,21 @@ app.post('/api/chat', async (req, res) => {
       return res.json({ answer: exactMatch.answer });
     }
 
-    // Step 2: Try text search
-    const textSearch = await Faq.find(
-      { $text: { $search: question } },
-      { score: { $meta: "textScore" } }
-    ).sort({ score: { $meta: "textScore" } }).limit(3);
+    // Step 2: Try fuzzy match
+const allFaqs = await Faq.find({});
+const input = question.trim().toLowerCase();
 
-    if (textSearch.length > 0) {
-      // Return top match with confidence threshold
-      if (textSearch[0].score > 0.8) {
-        return res.json({ answer: textSearch[0].answer });
-      }
-    }
+// Normalize DB questions
+const questions = allFaqs.map(f => f.question.trim().toLowerCase());
+const matches = stringSimilarity.findBestMatch(input, questions);
+const bestMatch = matches.bestMatch;
+
+if (bestMatch.rating > 0.6) {
+  // Get the original FAQ using the index (since we've normalized the list)
+  const matchedFaq = allFaqs[matches.bestMatchIndex];
+  return res.json({ answer: matchedFaq.answer });
+}
+
 
     // Step 3: Fallback response
     res.json({ 
@@ -281,8 +283,18 @@ app.post('/api/compare', async (req, res) => {
   }
 });
 
+// Get all college names API
+app.get('/api/colleges', async (req, res) => {
+  try {
+    const colleges = await College.find({}, 'name'); // Only get the 'name' field
+    res.json(colleges);
+  } catch (error) {
+    console.error('Error fetching colleges:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
-// Main APIs
+// Main APIs 
 app.get('/api/questions', async (req, res) => {
   try {
     const questions = await Question.find();
